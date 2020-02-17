@@ -7,6 +7,7 @@ import (
 	"github.com/c12s/discovery/storage"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -21,9 +22,14 @@ type Service struct {
 }
 
 func (ns *Service) sub(ctx context.Context) {
-	ns.w.Watch(ctx, func(msg string) {
-		ns.db.Store(ctx, msg)
-	})
+	if ns.w != nil {
+		ns.w.Watch(ctx, func(msg string) {
+			_, err := ns.db.Store(ctx, msg)
+			if err != nil {
+				fmt.Println(err)
+			}
+		})
+	}
 }
 
 func createBaseRouter(version string) *mux.Router {
@@ -35,7 +41,33 @@ func createBaseRouter(version string) *mux.Router {
 func (s *Service) setupEndpoints() {
 	d := s.r.PathPrefix("/discovery").Subrouter()
 	d.HandleFunc("/discover", s.discovery()).Methods("GET")
+	d.HandleFunc("/heartbeat", s.heartbeat()).Methods("POST")
+}
 
+func (s *Service) heartbeat() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		data, err := read(body)
+		if err != nil {
+			sendErrorMessage(w, "Could not decode the request body as JSON", http.StatusBadRequest)
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		_, err = s.db.Store(ctx, form(data))
+		cancel()
+		if err != nil {
+			fmt.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		sendJSONResponse(w, map[string]string{"message": "registered"})
+	}
 }
 
 func (s *Service) discovery() http.HandlerFunc {
@@ -76,7 +108,8 @@ func Run(v, address string, db storage.DB, w heartbeat.Heartbeat) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	server.sub(ctx)
+	db.Watcher(ctx)
 
-	fmt.Println("Server Started")
+	fmt.Println("Discovery Service Started")
 	http.ListenAndServe(server.address, handlers.LoggingHandler(os.Stdout, server.r))
 }

@@ -3,7 +3,7 @@ discovery:
   address: localhost:8080
   db:
     - 0.0.0.0:2379
-  heartbeat: address: 0.0.0.0:4222
+  heartbeat: 0.0.0.0:4222
   heartbeatTopic: /heartbeat/
   instrument:
     address: 0.0.0.0:4222

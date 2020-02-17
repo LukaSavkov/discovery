@@ -1,7 +1,6 @@
 package etcd
 
 import (
-	"log"
 	"strings"
 )
 
@@ -27,10 +26,8 @@ func (e *ETCD) cache(mkey, skey string) {
 func (e *ETCD) put(key string) {
 	if ok, mkey, skey := e.in(key); ok {
 		e.cache(mkey, skey)
-		log.Println("Cached: ", e.services)
 	} else {
 		e.services[mkey] = append(e.services[mkey], skey)
-		log.Println("New key added: ", e.services, mkey, skey)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"github.com/c12s/discovery/model"
 	"log"
 	"net/http"
+	"strings"
 )
 
 func sendJSONResponse(w http.ResponseWriter, data interface{}) {
@@ -52,4 +53,18 @@ func resp(service, address string) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+func read(body []byte) (*model.Resp, error) {
+	data := &model.Resp{}
+	if err := json.Unmarshal(body, data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// key /heartbeat/service|address
+func form(data *model.Resp) string {
+	prefix := strings.Join([]string{"/heartbeat", data.Service}, "/")
+	return strings.Join([]string{prefix, data.Address}, "|")
 }
